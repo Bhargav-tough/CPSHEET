@@ -9,13 +9,18 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
-app.use(cors({ origin: 'http://localhost:5173' }));
+const allowedOrigins = process.env.CLIENT_URL
+  ? [process.env.CLIENT_URL.replace(/\/+$/, ''), 'http://localhost:5173']
+  : '*';
+
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 app.use('/api/problems', problemRoutes);
 
 app.get('/', (req, res) => res.send('CP Sheet API is running.'));
+app.get('/health', (req, res) => res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 // ─── MongoDB Connection ───────────────────────────────────────────────────────
 mongoose

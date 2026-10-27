@@ -85,5 +85,25 @@ Admin endpoints require `Authorization: Bearer <passkey>` header.
 - **Backend validates every write request** — `adminAuth.js` middleware checks against the hashed MongoDB passkey.
 - **Frontend session** — Passkey stored in `sessionStorage` (cleared on tab close).
 
+## Deployment & Hosting
+
+### 1. Backend (e.g. Render / Railway)
+- **Root Directory**: `server`
+- **Build Command**: `npm install`
+- **Start Command**: `npm start`
+- **Environment Variables**:
+  - `MONGO_URI`: `mongodb+srv://<user>:<password>@cluster.mongodb.net/cpsheet`
+  - `CLIENT_URL`: `https://your-frontend.vercel.app` (your frontend deployment URL)
+  - `PORT`: `5000` (optional, cloud providers assign this automatically)
+
+### 2. Frontend (e.g. Vercel / Netlify)
+- **Root Directory**: `client`
+- **Framework Preset**: Vite
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist`
+- **Environment Variables**:
+  - `VITE_API_URL`: `https://your-backend.onrender.com/api` (your deployed backend API URL)
+
 ---
+
 © Bhargav Dubey

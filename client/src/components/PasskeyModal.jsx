@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { API_BASE } from '../api';
 
 // Modal that handles both:
 // 1. First-Time Setup: If no passkey exists in MongoDB yet, prompts the owner to create one.

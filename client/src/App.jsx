@@ -3,8 +3,7 @@ import Navbar from './components/Navbar';
 import RatingSection from './components/RatingSection';
 import PasskeyModal from './components/PasskeyModal';
 import AddProblem from './components/AddProblem';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { API_BASE } from './api';
 
 const RATINGS_ORDER = [
   800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700,
