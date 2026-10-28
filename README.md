@@ -104,6 +104,7 @@ Admin endpoints require `Authorization: Bearer <passkey>` header. User endpoints
 - **Environment Variables**:
   - `MONGO_URI`: `mongodb+srv://<user>:<password>@cluster.mongodb.net/cpsheet`
   - `CLIENT_URL`: `https://your-frontend.vercel.app` (your frontend deployment URL)
+  - `JWT_SECRET`: `any_long_random_secret_string` (used to sign user login tokens)
   - `PORT`: `5000` (optional, cloud providers assign this automatically)
 
 ### 2. Frontend (e.g. Vercel / Netlify)
