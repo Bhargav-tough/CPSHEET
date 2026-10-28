@@ -64,6 +64,16 @@ npm run dev   # starts on http://localhost:5173
 
 ## API Endpoints
 
+### User Authentication & Solved Progress (MongoDB)
+| Method | Route | Auth | Description |
+|--------|-------|------|-------------|
+| POST | `/api/auth/register` | Public | Register user (`username`, `password`), returns token |
+| POST | `/api/auth/login` | Public | Sign in with username & password, returns token |
+| GET | `/api/auth/me` | User | Get current profile & solved problem IDs from MongoDB |
+| POST | `/api/auth/toggle-solve/:problemId` | User | Mark / unmark problem as solved in MongoDB |
+| POST | `/api/auth/sync-solved` | User | Sync local solved questions to user's MongoDB record |
+
+### Problems & Admin Passkey
 | Method | Route | Auth | Description |
 |--------|-------|------|-------------|
 | GET | `/api/problems/passkey-status` | Public | Check if master passkey has been initialized |
@@ -75,7 +85,7 @@ npm run dev   # starts on http://localhost:5173
 | PUT | `/api/problems/:id` | Admin | Update problem |
 | DELETE | `/api/problems/:id` | Admin | Delete problem |
 
-Admin endpoints require `Authorization: Bearer <passkey>` header.
+Admin endpoints require `Authorization: Bearer <passkey>` header. User endpoints require `Authorization: Bearer <user_jwt_token>` header.
 
 ## Security Design
 

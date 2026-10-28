@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 const problemRoutes = require('./routes/problemRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,6 +19,7 @@ app.use(express.json());
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 app.use('/api/problems', problemRoutes);
+app.use('/api/auth', authRoutes);
 
 app.get('/', (req, res) => res.send('CP Sheet API is running.'));
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() }));

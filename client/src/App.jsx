@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Navbar from './components/Navbar';
-import RatingSection from './components/RatingSection';
+import ProblemListBlock from './components/ProblemListBlock';
 import PasskeyModal from './components/PasskeyModal';
+import UserAuthModal from './components/UserAuthModal';
 import AddProblem from './components/AddProblem';
-import { API_BASE } from './api';
+import { API_BASE, authApi } from './api';
+import { getRatingClass } from './utils/rating';
 
 const RATINGS_ORDER = [
   800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700,
@@ -39,18 +41,24 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // User state (stored in MongoDB)
+  const [userToken, setUserToken] = useState(() => localStorage.getItem('cp_user_token') || '');
+  const [user, setUser] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState('login');
+  const [authPromptMessage, setAuthPromptMessage] = useState('');
+
   // Admin state — passkey persisted in sessionStorage only
   const [adminToken, setAdminToken] = useState(() => sessionStorage.getItem('cp_admin_token') || '');
   const isAdmin = Boolean(adminToken);
+  const [showPasskeyModal, setShowPasskeyModal] = useState(false);
 
   // UI state
-  const [showPasskeyModal, setShowPasskeyModal] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingProblem, setEditingProblem] = useState(null);
   const [addProblemRating, setAddProblemRating] = useState(800);
-  const [viewMode, setViewMode] = useState('board'); // 'board' (horizontal) or 'grid'
 
-  // Solved state persisted in localStorage
+  // Solved state Set (synced with MongoDB when user is logged in)
   const [solvedIds, setSolvedIds] = useState(() => {
     try {
       const saved = localStorage.getItem('cp_solved_problems');
@@ -60,15 +68,15 @@ function App() {
     }
   });
 
-  // Filters
+  // Active Rating Tab ('all' or a specific rating number like '800')
+  const [activeRatingTab, setActiveRatingTab] = useState('all');
+
+  // Search & Tag Filter
   const [search, setSearch] = useState('');
-  const [ratingFilter, setRatingFilter] = useState('');
+  const [selectedTag, setSelectedTag] = useState('');
 
   // Toasts
   const [toasts, setToasts] = useState([]);
-
-  // Horizontal board reference for smooth scrolling
-  const boardRef = useRef(null);
 
   const showToast = (message, type = 'success') => {
     const id = Date.now();
@@ -76,16 +84,32 @@ function App() {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
   };
 
+  // ─── Restore User Session on mount ──────────────────────────────────────────
+  useEffect(() => {
+    if (!userToken) return;
+    authApi
+      .getMe(userToken)
+      .then((data) => {
+        setUser(data.user);
+        if (Array.isArray(data.user.solvedProblems)) {
+          const remoteSolved = new Set(data.user.solvedProblems.map((id) => id.toString()));
+          setSolvedIds(remoteSolved);
+          localStorage.setItem('cp_solved_problems', JSON.stringify([...remoteSolved]));
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem('cp_user_token');
+        setUserToken('');
+        setUser(null);
+      });
+  }, [userToken]);
+
   // ─── Fetch problems ─────────────────────────────────────────────────────────
   const fetchProblems = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams();
-      if (search) params.append('search', search);
-      if (ratingFilter) params.append('rating', ratingFilter);
-
-      const res = await fetch(`${API_BASE}/problems?${params}`);
+      const res = await fetch(`${API_BASE}/problems`);
       if (!res.ok) throw new Error('Failed to fetch problems.');
       const data = await res.json();
       setProblems(data);
@@ -94,33 +118,86 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, [search, ratingFilter]);
+  }, []);
 
   useEffect(() => {
-    const timeout = setTimeout(fetchProblems, 300);
-    return () => clearTimeout(timeout);
+    fetchProblems();
   }, [fetchProblems]);
 
-  // ─── Solved Toggle Handler ──────────────────────────────────────────────────
-  const handleToggleSolved = (problemId) => {
-    setSolvedIds((prev) => {
-      const next = new Set(prev);
-      const isNowSolved = !next.has(problemId);
-      if (isNowSolved) {
-        next.add(problemId);
-        const prob = problems.find((p) => p._id === problemId);
-        showToast(`Marked "${prob?.name || 'Problem'}" as Solved! 🎯`, 'success');
+  // ─── Solved Toggle Handler (Synced to MongoDB) ──────────────────────────────
+  const handleToggleSolved = async (problemId) => {
+    if (!userToken) {
+      // Prompt user to sign in or register so their progress is saved to MongoDB
+      setAuthModalMode('login');
+      setAuthPromptMessage('Sign in or create an account to save your solved questions to MongoDB across all devices!');
+      setShowAuthModal(true);
+
+      // Temporary local toggle for guest convenience
+      setSolvedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(problemId)) next.delete(problemId);
+        else next.add(problemId);
+        try {
+          localStorage.setItem('cp_solved_problems', JSON.stringify([...next]));
+        } catch (e) {
+          console.error(e);
+        }
+        return next;
+      });
+      return;
+    }
+
+    // Authenticated user: update in MongoDB
+    try {
+      const data = await authApi.toggleSolve(userToken, problemId);
+      const updatedSet = new Set(data.solvedProblems.map((id) => id.toString()));
+      setSolvedIds(updatedSet);
+      localStorage.setItem('cp_solved_problems', JSON.stringify([...updatedSet]));
+
+      const prob = problems.find((p) => p._id === problemId);
+      const name = prob?.name || 'Problem';
+      if (data.isSolved) {
+        showToast(`Marked "${name}" as Solved! 🎯 Synced to MongoDB.`, 'success');
       } else {
-        next.delete(problemId);
-        showToast('Problem unmarked.', 'success');
+        showToast(`Unmarked "${name}". Synced to MongoDB.`, 'success');
       }
+    } catch (err) {
+      showToast(err.message || 'Failed to update solved status', 'error');
+    }
+  };
+
+  // ─── User Authentication Handlers ───────────────────────────────────────────
+  const handleAuthSuccess = async (authData) => {
+    setUserToken(authData.token);
+    setUser(authData.user);
+    localStorage.setItem('cp_user_token', authData.token);
+    setShowAuthModal(false);
+
+    // Sync any previously saved local solved problems with MongoDB
+    const localArray = Array.from(solvedIds);
+    if (localArray.length > 0) {
       try {
-        localStorage.setItem('cp_solved_problems', JSON.stringify([...next]));
+        const synced = await authApi.syncSolved(authData.token, localArray);
+        const nextSet = new Set(synced.solvedProblems.map((id) => id.toString()));
+        setSolvedIds(nextSet);
+        localStorage.setItem('cp_solved_problems', JSON.stringify([...nextSet]));
       } catch (e) {
-        console.error(e);
+        console.error('Failed to sync local progress:', e);
       }
-      return next;
-    });
+    } else if (authData.user.solvedProblems) {
+      const nextSet = new Set(authData.user.solvedProblems.map((id) => id.toString()));
+      setSolvedIds(nextSet);
+      localStorage.setItem('cp_solved_problems', JSON.stringify([...nextSet]));
+    }
+
+    showToast(`Welcome, @${authData.user.username}! Your progress is synced to MongoDB.`, 'success');
+  };
+
+  const handleUserLogout = () => {
+    localStorage.removeItem('cp_user_token');
+    setUserToken('');
+    setUser(null);
+    showToast('Signed out. Future progress will only be stored locally.', 'success');
   };
 
   // ─── Admin Handlers ─────────────────────────────────────────────────────────
@@ -129,6 +206,7 @@ function App() {
     if (isAdmin) {
       setEditingProblem(null);
       setShowForm(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       setShowPasskeyModal(true);
     }
@@ -141,13 +219,13 @@ function App() {
     setShowForm(true);
     showToast(
       isFirstTime
-        ? 'Passkey saved to MongoDB! Setup permanently locked.'
-        : 'Admin access granted. Welcome, Bhargav!',
+        ? 'Admin passkey initialized in MongoDB! Setup locked.'
+        : 'Admin session unlocked. Welcome!',
       'success'
     );
   };
 
-  const handleLogout = () => {
+  const handleAdminLogout = () => {
     sessionStorage.removeItem('cp_admin_token');
     setAdminToken('');
     setShowForm(false);
@@ -170,7 +248,6 @@ function App() {
       });
       if (!res.ok) throw new Error('Delete failed.');
       setProblems((prev) => prev.filter((p) => p._id !== id));
-      // Clean up from solved if present
       setSolvedIds((prev) => {
         if (!prev.has(id)) return prev;
         const next = new Set(prev);
@@ -178,81 +255,123 @@ function App() {
         localStorage.setItem('cp_solved_problems', JSON.stringify([...next]));
         return next;
       });
-      showToast('Problem deleted.', 'success');
+      showToast('Problem deleted successfully.', 'success');
     } catch (err) {
       showToast(err.message, 'error');
     }
   };
 
-  const handleSave = (saved, isUpdate) => {
-    if (isUpdate) {
-      setProblems((prev) => prev.map((p) => (p._id === saved._id ? saved : p)));
+  const handleSave = (savedProblem, isEdit) => {
+    if (isEdit) {
+      setProblems((prev) =>
+        prev.map((p) => (p._id === savedProblem._id ? savedProblem : p))
+      );
+      showToast('Problem updated!', 'success');
     } else {
-      setProblems((prev) => [...prev, saved]);
+      setProblems((prev) => [savedProblem, ...prev]);
+      showToast('New problem added!', 'success');
+      // If we added a problem for a specific rating, switch tab to view it
+      if (savedProblem.rating) {
+        setActiveRatingTab(String(savedProblem.rating));
+      }
     }
     setShowForm(false);
     setEditingProblem(null);
   };
 
-  // ─── Group problems by rating ───────────────────────────────────────────────
-  const ratingMap = {};
-  problems.forEach((p) => {
-    if (!ratingMap[p.rating]) ratingMap[p.rating] = [];
-    ratingMap[p.rating].push(p);
-  });
+  // ─── Rating Stats & Tabs Computation ────────────────────────────────────────
+  const ratingMap = useMemo(() => {
+    const map = {};
+    for (const p of problems) {
+      const r = p.rating || 800;
+      if (!map[r]) map[r] = [];
+      map[r].push(p);
+    }
+    return map;
+  }, [problems]);
 
-  // Calculate highest rating that exists
-  const highestProblemRating = problems.length
-    ? Math.max(...problems.map((p) => p.rating))
-    : 1500;
+  // All distinct ratings found in problems plus standard tiers that have problems
+  const availableRatings = useMemo(() => {
+    const fromProblems = Object.keys(ratingMap).map(Number);
+    const combined = Array.from(new Set([...RATINGS_ORDER.filter((r) => ratingMap[r]?.length > 0), ...fromProblems]));
+    return combined.sort((a, b) => a - b);
+  }, [ratingMap]);
 
-  // Horizontal Ladder: 800, 900, 1000, 1100, 1200, 1300, 1400, 1500...
-  const boardLadder = RATINGS_ORDER.filter(
-    (r) => r <= Math.max(2000, highestProblemRating) || (ratingMap[r] && ratingMap[r].length > 0)
-  );
+  // All distinct tags for quick filter
+  const allTags = useMemo(() => {
+    const tags = new Set();
+    for (const p of problems) {
+      if (Array.isArray(p.tags)) {
+        p.tags.forEach((t) => tags.add(t));
+      }
+    }
+    return Array.from(tags).sort();
+  }, [problems]);
 
-  const displayRatings = ratingFilter
-    ? [Number(ratingFilter)]
-    : search
-      ? RATINGS_ORDER.filter((r) => ratingMap[r] && ratingMap[r].length > 0)
-      : boardLadder;
+  // Filtered problems for the active tab + search + tag filter
+  const displayedProblems = useMemo(() => {
+    let list = problems;
 
+    // Filter by active tab
+    if (activeRatingTab !== 'all') {
+      const targetRating = Number(activeRatingTab);
+      list = list.filter((p) => p.rating === targetRating);
+    }
+
+    // Filter by search query
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter((p) => {
+        const matchesName = p.name?.toLowerCase().includes(q);
+        const matchesRating = String(p.rating).includes(q);
+        const matchesTag = p.tags?.some((t) => t.toLowerCase().includes(q));
+        return matchesName || matchesRating || matchesTag;
+      });
+    }
+
+    // Filter by selected tag
+    if (selectedTag) {
+      list = list.filter((p) => p.tags?.includes(selectedTag));
+    }
+
+    return list;
+  }, [problems, activeRatingTab, search, selectedTag]);
+
+  // Overall stats
   const totalProblems = problems.length;
   const solvedCount = problems.filter((p) => solvedIds.has(p._id)).length;
-  const uniqueRatings = Object.keys(ratingMap).length;
-  const uniqueTags = [...new Set(problems.flatMap((p) => p.tags))].length;
   const solvedPercentage = totalProblems > 0 ? Math.round((solvedCount / totalProblems) * 100) : 0;
-
-  // Horizontal Board scroll helpers
-  const scrollBoard = (offset) => {
-    if (boardRef.current) {
-      boardRef.current.scrollBy({ left: offset, behavior: 'smooth' });
-    }
-  };
-
-  const scrollToRating = (rating) => {
-    const el = document.getElementById(`section-${rating}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
-    }
-  };
 
   return (
     <>
-      {/* Navbar */}
-      <Navbar isAdmin={isAdmin} onCreateClick={() => handleCreateClick(800)} onLogout={handleLogout} />
+      {/* Navbar with User Auth & Admin Controls */}
+      <Navbar
+        user={user}
+        solvedCount={solvedCount}
+        onOpenAuth={(mode) => {
+          setAuthModalMode(mode);
+          setAuthPromptMessage('');
+          setShowAuthModal(true);
+        }}
+        onUserLogout={handleUserLogout}
+        isAdmin={isAdmin}
+        onCreateClick={() => handleCreateClick(activeRatingTab === 'all' ? 800 : Number(activeRatingTab))}
+        onAdminLogout={handleAdminLogout}
+      />
 
-      {/* Hero */}
+      {/* Hero Header */}
       <section className="hero">
         <div className="hero-badge">
           <span className="hero-badge-dot" />
-          Competitive Programming Ladder
+          Codeforces Ladder & Sheet
         </div>
         <h1>Practice. Improve. Repeat.</h1>
-        <p>Curated Codeforces problem ladder with horizontal 800, 900, 1000… rating sections and solved question marking.</p>
+        <p>
+          Curated Codeforces problem sets categorized by rating. Sign in to sync your solved questions across devices.
+        </p>
       </section>
 
-      {/* Stats */}
+      {/* Global Stats Bar */}
       <div className="stats-bar">
         <div className="stat-item">
           <div className="stat-value">{totalProblems}</div>
@@ -265,77 +384,16 @@ function App() {
           <div className="stat-label">Solved ({solvedPercentage}%)</div>
         </div>
         <div className="stat-item">
-          <div className="stat-value">{uniqueRatings}</div>
+          <div className="stat-value">{availableRatings.length}</div>
           <div className="stat-label">Active Ratings</div>
         </div>
         <div className="stat-item">
-          <div className="stat-value">{uniqueTags}</div>
-          <div className="stat-label">Tags</div>
+          <div className="stat-value">{allTags.length}</div>
+          <div className="stat-label">Problem Tags</div>
         </div>
       </div>
 
-      {/* Filter Bar with Horizontal Controls */}
-      <div className="filter-bar">
-        <div className="search-input-wrapper">
-          <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            id="search-problems"
-            className="search-input"
-            type="text"
-            placeholder="Search problems or tags…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        <select
-          id="filter-rating"
-          className="filter-select"
-          value={ratingFilter}
-          onChange={(e) => setRatingFilter(e.target.value)}
-        >
-          <option value="">All Ratings (800 - 3500)</option>
-          {RATINGS_ORDER.map((r) => (
-            <option key={r} value={r}>Rating {r} {ratingMap[r] ? `(${ratingMap[r].length})` : ''}</option>
-          ))}
-        </select>
-
-        {/* View Mode Switcher */}
-        <div className="view-mode-toggle" role="group" aria-label="Layout mode">
-          <button
-            type="button"
-            className={`view-mode-btn ${viewMode === 'board' ? 'active' : ''}`}
-            onClick={() => setViewMode('board')}
-            title="Horizontal Board view (800, 900, 1000... aligned horizontally)"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="5" height="18" rx="1" />
-              <rect x="10" y="3" width="5" height="18" rx="1" />
-              <rect x="17" y="3" width="5" height="18" rx="1" />
-            </svg>
-            Horizontal Board
-          </button>
-          <button
-            type="button"
-            className={`view-mode-btn ${viewMode === 'grid' ? 'active' : ''}`}
-            onClick={() => setViewMode('grid')}
-            title="Grid List view"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-            </svg>
-            Grid
-          </button>
-        </div>
-      </div>
-
-      {/* Main Content */}
+      {/* Main Container */}
       <main className="main-content">
         {/* Admin Form */}
         {isAdmin && showForm && (
@@ -349,7 +407,92 @@ function App() {
           />
         )}
 
-        {/* Loading */}
+        {/* Search & Tag Filter Bar */}
+        <div className="filter-bar">
+          <div className="search-input-wrapper">
+            <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              id="search-problems"
+              className="search-input"
+              type="text"
+              placeholder="Search problem title or tags…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                type="button"
+                className="search-clear-btn"
+                onClick={() => setSearch('')}
+                title="Clear search"
+              >
+                &times;
+              </button>
+            )}
+          </div>
+
+          {allTags.length > 0 && (
+            <select
+              className="filter-select"
+              value={selectedTag}
+              onChange={(e) => setSelectedTag(e.target.value)}
+            >
+              <option value="">All Tags</option>
+              {allTags.map((tag) => (
+                <option key={tag} value={tag}>
+                  #{tag}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {/* ─── RATING TABS BAR (Horizontal tabs of ratings) ─── */}
+        <div className="rating-tabs-container">
+          <div className="rating-tabs-header-label">Rating Tabs:</div>
+          <div className="rating-tabs-list" role="tablist">
+            {/* 'All' Tab */}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeRatingTab === 'all'}
+              className={`rating-tab-btn ${activeRatingTab === 'all' ? 'active' : ''}`}
+              onClick={() => setActiveRatingTab('all')}
+            >
+              <span className="tab-rating-label">All</span>
+              <span className="tab-count-badge">{totalProblems}</span>
+            </button>
+
+            {/* Individual Rating Tabs (800, 900, 1000...) */}
+            {availableRatings.map((rating) => {
+              const ratingClass = getRatingClass(rating);
+              const count = ratingMap[rating]?.length || 0;
+              const solvedInRating = (ratingMap[rating] || []).filter((p) => solvedIds.has(p._id)).length;
+              const isAllSolvedInRating = count > 0 && solvedInRating === count;
+
+              return (
+                <button
+                  key={rating}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeRatingTab === String(rating)}
+                  className={`rating-tab-btn ${ratingClass} ${activeRatingTab === String(rating) ? 'active' : ''}`}
+                  onClick={() => setActiveRatingTab(String(rating))}
+                >
+                  <span className="tab-rating-label">{rating}</span>
+                  <span className={`tab-count-badge ${isAllSolvedInRating ? 'all-solved' : ''}`}>
+                    {solvedInRating > 0 ? `${solvedInRating}/${count}` : count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Loading Spinner */}
         {loading && (
           <div className="loading-container">
             <div className="spinner" />
@@ -357,7 +500,7 @@ function App() {
           </div>
         )}
 
-        {/* Error */}
+        {/* Error Alert */}
         {!loading && error && (
           <div className="empty-state">
             <div className="empty-state-icon">⚠️</div>
@@ -369,103 +512,19 @@ function App() {
           </div>
         )}
 
-        {/* Problem Board Layout */}
+        {/* ─── LIST-WISE QUESTION VIEW COVERING THE BLOCK ─── */}
         {!loading && !error && (
-          <>
-            {displayRatings.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-state-icon">🔍</div>
-                <h3>No problems found</h3>
-                <p>
-                  {search
-                    ? `No matches for "${search}". Try a different keyword or tag.`
-                    : 'No problems added yet. Click Create to get started!'}
-                </p>
-              </div>
-            ) : viewMode === 'board' ? (
-              <div className="ratings-horizontal-board-wrapper">
-                {/* Horizontal Quick Jump Navigation Strip */}
-                <div className="ratings-nav-bar">
-                  <button
-                    type="button"
-                    className="board-scroll-btn"
-                    onClick={() => scrollBoard(-450)}
-                    title="Scroll left"
-                    aria-label="Scroll left"
-                  >
-                    ‹
-                  </button>
-
-                  <div className="ratings-nav-pills">
-                    {displayRatings.map((r) => {
-                      const count = ratingMap[r]?.length || 0;
-                      const solvedInR = (ratingMap[r] || []).filter((p) => solvedIds.has(p._id)).length;
-                      return (
-                        <button
-                          key={r}
-                          type="button"
-                          className="rating-nav-pill"
-                          onClick={() => scrollToRating(r)}
-                          title={`Jump to Rating ${r} (${count} problems)`}
-                        >
-                          <span className="pill-rating">{r}</span>
-                          {count > 0 && (
-                            <span className={`pill-count ${solvedInR === count ? 'all-solved' : ''}`}>
-                              {solvedInR}/{count}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <button
-                    type="button"
-                    className="board-scroll-btn"
-                    onClick={() => scrollBoard(450)}
-                    title="Scroll right"
-                    aria-label="Scroll right"
-                  >
-                    ›
-                  </button>
-                </div>
-
-                {/* ─── Horizontal Sections Block Row (800, 900, 1000... horizontally aligned) ─── */}
-                <div className="ratings-board" ref={boardRef}>
-                  {displayRatings.map((rating) => (
-                    <RatingSection
-                      key={rating}
-                      rating={rating}
-                      problems={ratingMap[rating] || []}
-                      isAdmin={isAdmin}
-                      solvedSet={solvedIds}
-                      onToggleSolved={handleToggleSolved}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      onAddProblemForRating={(r) => handleCreateClick(r)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ) : (
-              /* Grid view fallback */
-              <div className="ratings-grid-view">
-                {displayRatings.map((rating) => (
-                  <RatingSection
-                    key={rating}
-                    rating={rating}
-                    problems={ratingMap[rating] || []}
-                    isAdmin={isAdmin}
-                    solvedSet={solvedIds}
-                    onToggleSolved={handleToggleSolved}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                    onAddProblemForRating={(r) => handleCreateClick(r)}
-                  />
-                ))}
-              </div>
-            )}
-          </>
+          <ProblemListBlock
+            activeRating={activeRatingTab}
+            problems={displayedProblems}
+            solvedSet={solvedIds}
+            isAdmin={isAdmin}
+            onToggleSolved={handleToggleSolved}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onAddProblem={(r) => handleCreateClick(r)}
+            user={user}
+          />
         )}
       </main>
 
@@ -474,7 +533,17 @@ function App() {
         © <span>Bhargav Dubey</span> — Codeforces Practice Sheet & Ladder
       </footer>
 
-      {/* Passkey Modal */}
+      {/* User Auth Modal (Login / Register) */}
+      {showAuthModal && (
+        <UserAuthModal
+          initialMode={authModalMode}
+          promptMessage={authPromptMessage}
+          onSuccess={handleAuthSuccess}
+          onClose={() => setShowAuthModal(false)}
+        />
+      )}
+
+      {/* Admin Passkey Modal */}
       {showPasskeyModal && (
         <PasskeyModal
           onSuccess={handlePasskeySuccess}
@@ -489,4 +558,3 @@ function App() {
 }
 
 export default App;
-

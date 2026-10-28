@@ -1486,3 +1486,531 @@ body {
         scroll-behavior: auto !important;
     }
 }
+
+
+/* ─── User Profile & Auth Modal ──────────────────────────────────────────────── */
+.user-profile-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.user-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    background: var(--paper);
+    border: var(--line);
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.user-name {
+    font-weight: 700;
+    color: var(--pen);
+}
+
+.user-solved-count {
+    padding: 2px 7px;
+    background: #c3e6cb;
+    color: #155724;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.user-auth-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+}
+
+.admin-session-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.auth-modal-card {
+    max-width: 440px;
+}
+
+.auth-tabs {
+    display: flex;
+    gap: 0;
+    border: var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 20px;
+    background: var(--paper);
+}
+
+.auth-tab {
+    flex: 1;
+    padding: 10px 16px;
+    font-family: var(--font-display);
+    font-size: 0.92rem;
+    font-weight: 700;
+    border: none;
+    background: transparent;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.auth-tab.active {
+    background: var(--ink);
+    color: #ffffff;
+}
+
+.auth-error-alert {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    background: #fde8e8;
+    border: 1.5px solid var(--bad);
+    border-radius: var(--radius);
+    color: var(--bad);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.spinner-inline {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+/* ─── Rating Tabs Bar ────────────────────────────────────────────────────────── */
+.rating-tabs-container {
+    margin: 20px 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rating-tabs-header-label {
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+}
+
+.rating-tabs-list {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scrollbar-width: thin;
+}
+
+.rating-tabs-list::-webkit-scrollbar {
+    height: 6px;
+}
+
+.rating-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--sheet);
+    border: var(--line);
+    border-radius: 999px;
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--ink);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    box-shadow: 2px 2px 0 var(--ink);
+}
+
+.rating-tab-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 3px 3px 0 var(--ink);
+    background: #ffffff;
+}
+
+.rating-tab-btn.active {
+    background: var(--ink);
+    color: #ffffff;
+    transform: translateY(1px);
+    box-shadow: 1px 1px 0 var(--ink);
+}
+
+.rating-tab-btn .tab-count-badge {
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: var(--paper);
+    color: var(--ink);
+    border: 1px solid var(--ink);
+}
+
+.rating-tab-btn.active .tab-count-badge {
+    background: #ffffff;
+    color: var(--ink);
+    border-color: #ffffff;
+}
+
+.tab-count-badge.all-solved {
+    background: #c3e6cb !important;
+    color: #155724 !important;
+    border-color: #155724 !important;
+}
+
+/* ─── List-Wise Question View (Covering the entire block) ─────────────────────── */
+.problem-list-block {
+    width: 100%;
+    background: var(--sheet);
+    border: var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--stamp);
+    overflow: hidden;
+    margin-bottom: 36px;
+}
+
+.list-block-header {
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    background: #ffffff;
+    border-bottom: var(--line);
+}
+
+.list-block-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.list-block-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.list-block-title {
+    font-family: var(--font-display);
+    font-size: 1.45rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+}
+
+.list-block-subtitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    color: var(--ink-soft);
+    font-weight: 500;
+}
+
+.dot-divider {
+    color: var(--ink-faint);
+}
+
+.solved-stat {
+    font-weight: 700;
+    color: var(--pen);
+}
+
+.solved-stat.all-done {
+    color: var(--ok);
+}
+
+.user-synced-pill {
+    padding: 2px 8px;
+    background: #e8f0fe;
+    color: var(--pen);
+    border: 1px solid var(--pen);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.list-block-progress-track {
+    width: 100%;
+    height: 7px;
+    background: var(--paper);
+    border-bottom: var(--line);
+    overflow: hidden;
+}
+
+.list-block-progress-fill {
+    height: 100%;
+    background: var(--pen);
+    transition: width 0.3s ease;
+}
+
+.list-block-progress-fill.full {
+    background: var(--ok);
+}
+
+.list-block-empty {
+    padding: 60px 24px;
+    text-align: center;
+    color: var(--ink-soft);
+}
+
+.list-block-empty .empty-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+}
+
+.list-block-empty h3 {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    color: var(--ink);
+    margin-bottom: 6px;
+}
+
+/* ─── Question List Table / Rows ─────────────────────────────────────────────── */
+.question-list-table {
+    width: 100%;
+}
+
+.question-list-thead {
+    display: grid;
+    grid-template-columns: 50px 45px 1fr 100px 200px 130px;
+    align-items: center;
+    padding: 12px 20px;
+    background: var(--paper);
+    border-bottom: var(--line);
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-faint);
+}
+
+.question-list-tbody {
+    display: flex;
+    flex-direction: column;
+}
+
+.question-row {
+    display: grid;
+    grid-template-columns: 50px 45px 1fr 100px 200px 130px;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(27, 40, 56, 0.12);
+    background: #ffffff;
+    transition: background-color 0.15s ease;
+}
+
+.question-row:last-child {
+    border-bottom: none;
+}
+
+.question-row:hover {
+    background: #fafbf7;
+}
+
+.question-row.is-solved {
+    background: rgba(31, 122, 77, 0.04);
+}
+
+.row-solve-toggle {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    border: 2px solid var(--ink);
+    background: var(--sheet);
+    color: transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    padding: 0;
+}
+
+.row-solve-toggle:hover {
+    border-color: var(--ok);
+    color: var(--ok);
+}
+
+.row-solve-toggle.checked {
+    background: var(--ok);
+    border-color: var(--ok);
+    color: #ffffff;
+}
+
+.row-index {
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ink-faint);
+}
+
+.col-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding-right: 16px;
+}
+
+.problem-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: color 0.15s ease;
+    word-break: break-word;
+}
+
+.problem-link:hover {
+    color: var(--pen);
+    text-decoration: underline;
+}
+
+.problem-link.title-solved {
+    color: var(--ink-soft);
+}
+
+.external-icon {
+    flex-shrink: 0;
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+}
+
+.problem-link:hover .external-icon {
+    opacity: 1;
+    transform: translate(1px, -1px);
+}
+
+.solved-pill-tag {
+    flex-shrink: 0;
+    padding: 2px 7px;
+    background: #c3e6cb;
+    color: #155724;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.row-rating-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 800;
+    border: 1px solid var(--ink);
+    background: var(--paper);
+    color: var(--ink);
+}
+
+.row-tags-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.tag-chip {
+    padding: 2px 7px;
+    background: var(--paper);
+    border: 1px solid rgba(27, 40, 56, 0.15);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    font-weight: 500;
+}
+
+.no-tags {
+    color: var(--ink-faint);
+    font-size: 0.8rem;
+}
+
+.col-action {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.admin-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-solve-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    background: var(--ink);
+    color: #ffffff;
+    border-radius: var(--radius);
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.btn-solve-pill:hover {
+    background: var(--pen);
+    transform: translateY(-1px);
+}
+
+/* ─── Responsive Adjustments for List View ──────────────────────────────────── */
+@media (max-width: 900px) {
+    .question-list-thead {
+        display: none;
+    }
+
+    .question-row {
+        grid-template-columns: 45px 1fr auto;
+        gap: 12px;
+        padding: 16px;
+    }
+
+    .col-num {
+        display: none;
+    }
+
+    .col-rating {
+        grid-column: 2;
+        margin-top: 4px;
+    }
+
+    .col-tags {
+        grid-column: 2;
+        margin-top: 4px;
+    }
+
+    .col-action {
+        grid-column: 3;
+        grid-row: 1 / span 3;
+        flex-direction: column;
+        align-items: flex-end;
+    }
+}
